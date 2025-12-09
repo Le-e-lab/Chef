@@ -279,6 +279,16 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onBack, onSave, onRemix
     }
   };
 
+  const getDifficultyLevel = (level: string) => {
+    switch (level) {
+      case 'Easy': return 1;
+      case 'Medium': return 2;
+      case 'Hard': return 3;
+      case 'Expert': return 4;
+      default: return 1;
+    }
+  };
+
   // Cooking Mode UI Overlay
   if (isCookingMode) {
     const step = recipe.steps[currentStepIndex];
@@ -376,6 +386,7 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onBack, onSave, onRemix
     // Overview Screen
     if (currentStepIndex === -1) {
       const difficultyColors = getDifficultyColors(recipe.difficulty);
+      const difficultyLevel = getDifficultyLevel(recipe.difficulty);
 
       return (
         <div key="overview" className="space-y-6 animate-fade-in pb-10">
@@ -403,10 +414,17 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onBack, onSave, onRemix
               <div className="flex items-center gap-3">
                 <span className="text-amber-350">{recipe.cuisineStyle}</span>
                 <span className="text-stone-700">|</span>
-                <span className={`flex items-center gap-1.5 ${difficultyColors.text}`}>
-                   <span className={`w-1.5 h-1.5 rounded-full ${difficultyColors.bg} animate-pulse`}/>
+                <div className={`flex items-center gap-2 ${difficultyColors.text}`}>
+                   <div className="flex gap-0.5">
+                     {[1, 2, 3, 4].map((i) => (
+                       <div 
+                         key={i} 
+                         className={`w-1 h-3 rounded-full transition-colors ${i <= difficultyLevel ? difficultyColors.bg : 'bg-stone-800'}`}
+                       />
+                     ))}
+                   </div>
                    {recipe.difficulty}
-                </span>
+                </div>
               </div>
               <span className="flex items-center gap-1 text-stone-400"><Clock size={12}/> {recipe.totalTime}</span>
             </div>
