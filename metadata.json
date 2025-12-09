@@ -1,0 +1,8 @@
+{
+  "name": "Copy of The Chef's Muse",
+  "description": "An AI-powered culinary assistant that invents unique recipes based on the ingredients you have on hand. Just show your fridge and speak your cravings.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
