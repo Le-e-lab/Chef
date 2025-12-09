@@ -15,6 +15,7 @@ export interface Recipe {
   ingredientsFound: string[];
   pantryItemsNeeded: string[];
   steps: RecipeStep[];
+  constraints?: string[];
 }
 
 export enum AppState {

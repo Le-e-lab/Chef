@@ -73,7 +73,7 @@ export const generateRecipeFromInput = async (
 
   // Construct constraint string
   const constraintText = constraints.length > 0 
-    ? `IMPORTANT CONSTRAINTS: The user has the following limitations: ${constraints.join(', ')}. The recipe MUST strictly adhere to these.`
+    ? `CRITICAL CONSTRAINTS: The user has the following limitations: ${constraints.join(', ')}. You MUST strictly adhere to these. Do not use equipment that is restricted (e.g. if 'No Stove', use microwave, oven, or raw prep only).`
     : "";
 
   // Add text prompt or default instruction
@@ -91,13 +91,13 @@ export const generateRecipeFromInput = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-pro-preview', // Updated to 3-pro for thinking
       contents: { parts },
       config: {
         systemInstruction: RECIPE_GENERATION_SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
         responseSchema: recipeSchema,
-        temperature: 0.7, // Creativity
+        thinkingConfig: { thinkingBudget: 32768 }, // Max thinking budget for deep reasoning
       }
     });
 
@@ -110,7 +110,8 @@ export const generateRecipeFromInput = async (
     return {
       ...rawRecipe,
       id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      constraints: constraints // Store constraints in the recipe
     } as Recipe;
 
   } catch (error) {
@@ -134,8 +135,6 @@ export const generateDishImage = async (title: string, description: string): Pro
       }
     });
 
-    // Extract image
-    // Note: The new SDK for generateContent with image models returns the image in the parts.
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData && part.inlineData.data) {
         return part.inlineData.data;
@@ -144,7 +143,7 @@ export const generateDishImage = async (title: string, description: string): Pro
     throw new Error("No image data found in response");
   } catch (error) {
     console.error("Image Gen Error:", error);
-    throw error; // Propagate or handle
+    throw error; 
   }
 };
 
@@ -160,7 +159,7 @@ export const generateTTS = async (text: string): Promise<string> => {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' }, // 'Fenrir', 'Puck', 'Kore', 'Charon'
+            prebuiltVoiceConfig: { voiceName: 'Kore' }, 
           },
         },
       },

@@ -14,11 +14,17 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAbout, onCookbook 
       <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-amber-900/10 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-20%] w-[500px] h-[500px] bg-stone-800/30 rounded-full blur-[80px] pointer-events-none" />
 
+      {/* Floating Icons */}
+      <div className="absolute top-[10%] left-[10%] text-4xl opacity-10 animate-float pointer-events-none">🍅</div>
+      <div className="absolute top-[20%] right-[15%] text-3xl opacity-10 animate-float-delayed pointer-events-none">🌶️</div>
+      <div className="absolute bottom-[20%] left-[15%] text-5xl opacity-5 animate-float-delayed pointer-events-none">🥦</div>
+      <div className="absolute bottom-[10%] right-[20%] text-4xl opacity-10 animate-float pointer-events-none">🍋</div>
+
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center z-10">
         <div className="mb-10 relative">
            <div className="absolute inset-0 bg-amber-350 blur-2xl opacity-20 rounded-full"></div>
-           <ChefHat className="w-24 h-24 text-amber-350 relative z-10 drop-shadow-2xl" strokeWidth={1} />
+           <ChefHat className="w-24 h-24 text-amber-350 relative z-10 drop-shadow-2xl animate-float" strokeWidth={1} />
         </div>
 
         <h1 className="text-5xl md:text-7xl font-serif text-white mb-6 tracking-tight leading-none">
@@ -33,7 +39,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAbout, onCookbook 
         <div className="flex flex-col items-center gap-6">
           <button 
             onClick={onStart}
-            className="group relative px-10 py-5 bg-stone-100 text-stone-950 rounded-full font-serif font-bold text-lg tracking-wide hover:bg-amber-350 transition-all duration-500 flex items-center gap-3 overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_40px_rgba(217,185,100,0.4)]"
+            className="group relative px-10 py-5 bg-stone-100 text-stone-950 rounded-full font-serif font-bold text-lg tracking-wide hover:bg-amber-350 transition-all duration-500 flex items-center gap-3 overflow-hidden shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_40px_rgba(217,185,100,0.4)] hover:scale-105"
           >
             <span className="relative z-10">Open Your Fridge</span>
             <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
@@ -63,15 +69,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAbout, onCookbook 
       
       {/* Footer / Features */}
       <div className="p-8 pb-12 w-full max-w-4xl mx-auto grid grid-cols-3 gap-4 text-center text-stone-600 text-[10px] md:text-xs tracking-[0.2em] uppercase font-medium">
-         <div className="flex flex-col items-center gap-3">
+         <div className="flex flex-col items-center gap-3 hover:text-stone-400 transition-colors">
             <Sparkles className="w-5 h-5 text-stone-700" strokeWidth={1.5} />
             <span>AI Invention</span>
          </div>
-         <div className="flex flex-col items-center gap-3">
+         <div className="flex flex-col items-center gap-3 hover:text-stone-400 transition-colors">
             <Eye className="w-5 h-5 text-stone-700" strokeWidth={1.5} />
             <span>Visual Recognition</span>
          </div>
-         <div className="flex flex-col items-center gap-3">
+         <div className="flex flex-col items-center gap-3 hover:text-stone-400 transition-colors">
             <Mic className="w-5 h-5 text-stone-700" strokeWidth={1.5} />
             <span>Audio Guidance</span>
          </div>

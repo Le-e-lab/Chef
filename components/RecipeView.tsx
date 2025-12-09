@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Recipe } from '../types';
-import { Play, Pause, ChevronRight, ChevronLeft, Clock, ChefHat, RotateCcw, Volume2, Image as ImageIcon, BookCheck, Maximize2, Mic, X, Command } from 'lucide-react';
+import { Play, Pause, ChevronRight, ChevronLeft, Clock, ChefHat, RotateCcw, Volume2, Image as ImageIcon, BookCheck, Maximize2, Mic, X, Command, ArrowLeft, Heart, SlidersHorizontal, RefreshCw, CheckCircle2, Circle } from 'lucide-react';
 import { generateTTS, generateDishImage } from '../services/geminiService';
 
 interface RecipeViewProps {
   recipe: Recipe;
-  onReset: () => void;
+  onBack: () => void;
+  onSave: (recipe: Recipe) => void;
+  onRemix: (constraints: string[]) => void;
+  isSaved: boolean;
 }
 
 interface IWindow extends Window {
@@ -13,13 +16,22 @@ interface IWindow extends Window {
   SpeechRecognition: any;
 }
 
-const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onReset }) => {
+const CONSTRAINTS_OPTIONS = [
+  "No Stove", "Vegetarian", "Vegan", "Microwave Only", "Under 15m", "One Pot", "High Protein"
+];
+
+const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onBack, onSave, onRemix, isSaved }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(-1); // -1 is Overview
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [lastVoiceCommand, setLastVoiceCommand] = useState<string | null>(null);
+  const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(new Set());
+  
+  // Remix State
+  const [showRemixMenu, setShowRemixMenu] = useState(false);
+  const [remixConstraints, setRemixConstraints] = useState<string[]>(recipe.constraints || []);
   
   // Refs for state access inside event listeners
   const stepIndexRef = useRef(currentStepIndex);
@@ -45,6 +57,31 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onReset }) => {
     stepIndexRef.current = currentStepIndex;
     stopAudio(); // Stop audio when step changes
   }, [currentStepIndex]);
+
+  // Auto-Visualize Effect
+  useEffect(() => {
+    let mounted = true;
+    
+    const autoVisualize = async () => {
+      // Only generate if we haven't already and aren't currently doing so
+      if (!generatedImage && !isGeneratingImage && recipe) {
+        setIsGeneratingImage(true);
+        try {
+          const b64 = await generateDishImage(recipe.title, recipe.description);
+          if (mounted) setGeneratedImage(`data:image/jpeg;base64,${b64}`);
+        } catch (e) {
+          console.error("Auto visualization failed", e);
+        } finally {
+          if (mounted) setIsGeneratingImage(false);
+        }
+      }
+    };
+
+    autoVisualize();
+    
+    return () => { mounted = false; };
+  }, [recipe.id]); // Only run when recipe ID changes (new recipe loaded)
+
 
   // Voice Recognition Effect
   useEffect(() => {
@@ -192,19 +229,6 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onReset }) => {
     }
   };
 
-  const handleVisualize = async () => {
-    if (generatedImage || isGeneratingImage) return;
-    setIsGeneratingImage(true);
-    try {
-      const b64 = await generateDishImage(recipe.title, recipe.description);
-      setGeneratedImage(`data:image/jpeg;base64,${b64}`);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  };
-
   const nextStep = () => {
     if (currentStepIndex < recipe.steps.length - 1) {
       setCurrentStepIndex(curr => curr + 1);
@@ -220,6 +244,29 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onReset }) => {
   const enterCookingMode = () => {
     if (currentStepIndex === -1) setCurrentStepIndex(0);
     setIsCookingMode(true);
+  }
+
+  const toggleRemixConstraint = (c: string) => {
+    setRemixConstraints(prev => 
+      prev.includes(c) ? prev.filter(i => i !== c) : [...prev, c]
+    );
+  };
+
+  const handleRemixConfirm = () => {
+    setShowRemixMenu(false);
+    onRemix(remixConstraints);
+  };
+
+  const toggleIngredient = (idx: string) => {
+    setCheckedIngredients(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
   }
 
   const getDifficultyColors = (level: string) => {
@@ -331,22 +378,22 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onReset }) => {
       const difficultyColors = getDifficultyColors(recipe.difficulty);
 
       return (
-        <div key="overview" className="space-y-6 animate-fade-in">
+        <div key="overview" className="space-y-6 animate-fade-in pb-10">
           <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-stone-800 border border-stone-700 shadow-2xl group animate-slide-up" style={{animationDelay: '0.1s'}}>
              {generatedImage ? (
-               <img src={generatedImage} alt={recipe.title} className="w-full h-full object-cover animate-fade-in" />
+               <img src={generatedImage} alt={recipe.title} className="w-full h-full object-cover animate-fade-in duration-1000" />
              ) : (
-               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center">
-                 <ChefHat className="w-16 h-16 text-stone-600 mb-4" />
-                 <p className="text-stone-500 font-serif italic mb-6">"Cooking is an art, but you eat it."</p>
-                 <button 
-                  onClick={handleVisualize}
-                  disabled={isGeneratingImage}
-                  className="px-6 py-2 bg-stone-700 hover:bg-amber-350 hover:text-stone-900 transition-colors rounded-full text-white text-sm flex items-center gap-2"
-                 >
-                   {isGeneratingImage ? <span className="animate-spin">⌛</span> : <ImageIcon size={16}/>}
-                   Visualize Dish
-                 </button>
+               <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center relative overflow-hidden">
+                 {/* Shimmer Effect */}
+                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-stone-700/20 to-transparent animate-shimmer" style={{backgroundSize: '200% 100%'}}></div>
+                 
+                 <div className="z-10 flex flex-col items-center">
+                    <div className="relative mb-6">
+                        <div className="absolute inset-0 bg-amber-350/20 blur-xl rounded-full animate-pulse-slow"></div>
+                        <ChefHat className="w-16 h-16 text-stone-600 relative z-10" />
+                    </div>
+                    <p className="text-stone-500 font-serif italic mb-2 animate-pulse">Visualizing your masterpiece...</p>
+                 </div>
                </div>
              )}
           </div>
@@ -365,27 +412,57 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onReset }) => {
             </div>
             
             <h1 className="text-3xl font-serif text-white leading-tight">{recipe.title}</h1>
-            <div className="flex items-center gap-2 text-emerald-500/80 text-[10px] uppercase font-bold tracking-widest bg-emerald-950/20 border border-emerald-900/30 px-3 py-1 rounded-full w-fit">
-              <BookCheck size={12} />
-              Saved to Cookbook
+            
+            {/* Tags & Constraints */}
+            <div className="flex flex-wrap gap-2">
+              {isSaved && (
+                <div className="flex items-center gap-2 text-emerald-500/80 text-[10px] uppercase font-bold tracking-widest bg-emerald-950/20 border border-emerald-900/30 px-3 py-1 rounded-full w-fit">
+                  <BookCheck size={12} />
+                  Saved
+                </div>
+              )}
+              {recipe.constraints?.map(c => (
+                 <div key={c} className="flex items-center gap-2 text-red-400/80 text-[10px] uppercase font-bold tracking-widest bg-red-950/20 border border-red-900/30 px-3 py-1 rounded-full w-fit">
+                   {c}
+                 </div>
+              ))}
             </div>
+
             <p className="text-stone-400 leading-relaxed text-sm">{recipe.description}</p>
             
             <div className="bg-stone-800/50 p-4 rounded-xl border border-stone-800">
-              <h3 className="text-stone-300 text-xs font-bold uppercase tracking-wider mb-3">Ingredients</h3>
-              <ul className="text-stone-400 text-sm space-y-1">
-                {recipe.ingredientsFound.map((ing, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-350/50"></span>
-                    {ing}
-                  </li>
-                ))}
-                {recipe.pantryItemsNeeded.map((ing, i) => (
-                  <li key={`p-${i}`} className="flex items-center gap-2 text-stone-500 italic">
-                    <span className="w-1.5 h-1.5 rounded-full bg-stone-600"></span>
-                    {ing} (Pantry)
-                  </li>
-                ))}
+              <h3 className="text-stone-300 text-xs font-bold uppercase tracking-wider mb-3">Ingredients (Tap to Check)</h3>
+              <ul className="text-stone-400 text-sm space-y-2">
+                {recipe.ingredientsFound.map((ing, i) => {
+                  const key = `found-${i}`;
+                  const isChecked = checkedIngredients.has(key);
+                  return (
+                    <li 
+                      key={key} 
+                      onClick={() => toggleIngredient(key)}
+                      className={`flex items-center gap-3 cursor-pointer group transition-all duration-300 ${isChecked ? 'opacity-40' : 'opacity-100'}`}
+                    >
+                      {isChecked ? <CheckCircle2 size={16} className="text-amber-350" /> : <Circle size={16} className="text-stone-600 group-hover:text-amber-350" />}
+                      <span className={isChecked ? 'line-through decoration-stone-600' : ''}>{ing}</span>
+                    </li>
+                  )
+                })}
+                {recipe.pantryItemsNeeded.map((ing, i) => {
+                  const key = `pantry-${i}`;
+                  const isChecked = checkedIngredients.has(key);
+                  return (
+                    <li 
+                      key={key} 
+                      onClick={() => toggleIngredient(key)}
+                      className={`flex items-center gap-3 cursor-pointer group transition-all duration-300 ${isChecked ? 'opacity-40' : 'opacity-100'}`}
+                    >
+                      {isChecked ? <CheckCircle2 size={16} className="text-stone-500" /> : <Circle size={16} className="text-stone-600 group-hover:text-stone-400" />}
+                      <span className={`italic ${isChecked ? 'line-through decoration-stone-600 text-stone-600' : 'text-stone-500'}`}>
+                        {ing} (Pantry)
+                      </span>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           </div>
@@ -435,30 +512,80 @@ const RecipeView: React.FC<RecipeViewProps> = ({ recipe, onReset }) => {
 
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto w-full p-6 relative">
+      
+      {/* Remix Menu Overlay */}
+      {showRemixMenu && (
+        <div className="absolute inset-0 z-50 bg-stone-900/95 backdrop-blur-md p-6 flex flex-col animate-fade-in">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-xl font-serif text-white">Remix Recipe</h2>
+            <button onClick={() => setShowRemixMenu(false)} className="p-2 bg-stone-800 rounded-full text-stone-400">
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto">
+             <p className="text-stone-500 text-sm mb-6">Adjust your constraints and the Muse will re-invent this dish.</p>
+             <div className="grid grid-cols-2 gap-3">
+               {CONSTRAINTS_OPTIONS.map(c => (
+                 <button
+                   key={c}
+                   onClick={() => toggleRemixConstraint(c)}
+                   className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                     remixConstraints.includes(c) 
+                       ? 'bg-amber-350 border-amber-350 text-stone-900' 
+                       : 'bg-stone-800 border-stone-700 text-stone-400 hover:border-stone-600'
+                   }`}
+                 >
+                   {c}
+                 </button>
+               ))}
+             </div>
+          </div>
+
+          <button 
+            onClick={handleRemixConfirm}
+            className="w-full py-4 bg-amber-350 text-stone-900 font-bold rounded-xl flex items-center justify-center gap-2 mt-4"
+          >
+            <RefreshCw size={18} /> Regenerate Recipe
+          </button>
+        </div>
+      )}
+
       {/* Top Bar */}
-      <div className="flex items-center justify-between mb-2">
-        <button onClick={onReset} className="text-stone-500 hover:text-white transition-colors">
-          <RotateCcw size={20} />
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={onBack} className="p-2 -ml-2 text-stone-500 hover:text-white transition-colors flex items-center gap-1 group">
+          <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
         </button>
         
-        {/* Progress Dots */}
-        <div className="flex gap-1">
-          {recipe.steps.map((_, idx) => (
-             <div 
-               key={idx} 
-               className={`h-1 rounded-full transition-all duration-300 ${idx === currentStepIndex ? 'w-6 bg-amber-350' : 'w-2 bg-stone-800'}`}
-             />
-          ))}
-        </div>
+        <div className="flex items-center gap-2">
+           {/* Remix Button */}
+           <button 
+             onClick={() => setShowRemixMenu(true)}
+             className={`p-2 rounded-full transition-all ${remixConstraints.includes('No Stove') ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'text-stone-500 hover:text-amber-350 hover:bg-stone-800'}`}
+             title="Remix / Adjust Constraints"
+           >
+             <SlidersHorizontal size={20} />
+           </button>
 
-        {/* Cooking Mode Toggle */}
-        <button 
-          onClick={enterCookingMode}
-          className="text-stone-500 hover:text-amber-350 transition-colors"
-          title="Enter Cooking Mode (Hands-free)"
-        >
-          <Maximize2 size={20} />
-        </button>
+           {/* Save Button */}
+           <button 
+             onClick={() => !isSaved && onSave(recipe)}
+             disabled={isSaved}
+             className={`p-2 rounded-full transition-all ${isSaved ? 'text-emerald-500' : 'text-stone-500 hover:text-white hover:bg-stone-800'}`}
+             title={isSaved ? "Saved to Cookbook" : "Save Recipe"}
+           >
+             {isSaved ? <BookCheck size={20} /> : <Heart size={20} />}
+           </button>
+
+           {/* Cooking Mode Toggle */}
+           <button 
+             onClick={enterCookingMode}
+             className="p-2 text-stone-500 hover:text-amber-350 hover:bg-stone-800 rounded-full transition-colors"
+             title="Enter Cooking Mode (Hands-free)"
+           >
+             <Maximize2 size={20} />
+           </button>
+        </div>
       </div>
 
       {/* Main Card Area */}

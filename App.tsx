@@ -8,6 +8,17 @@ import { AppState, CaptureData, Recipe } from './types';
 import { generateRecipeFromInput } from './services/geminiService';
 import { Loader2, AlertCircle } from 'lucide-react';
 
+const LOADING_THOUGHTS = [
+  "Tasting the air...",
+  "Consulting Grandma's secret stash...",
+  "Chopping onions (virtually)...",
+  "Checking the spice rack...",
+  "Inventing a new flavor...",
+  "Asking the stars for salt...",
+  "Simmering ideas...",
+  "Pairing flavors..."
+];
+
 const App: React.FC = () => {
   // Start at LANDING instead of IDLE
   const [appState, setAppState] = useState<AppState>(AppState.LANDING);
@@ -15,6 +26,17 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<Recipe[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  
+  // Fun loading state
+  const [loadingThought, setLoadingThought] = useState(LOADING_THOUGHTS[0]);
+  
+  // Track if current recipe is saved to history
+  const [isCurrentRecipeSaved, setIsCurrentRecipeSaved] = useState(false);
+  
+  // Keep track of current inputs for regeneration/remixing
+  const [currentSessionImages, setCurrentSessionImages] = useState<string[]>([]);
+  const [currentSessionAudio, setCurrentSessionAudio] = useState<string | null>(null);
+  const [currentSessionText, setCurrentSessionText] = useState<string | undefined>(undefined);
 
   // Load history on mount
   useEffect(() => {
@@ -28,17 +50,39 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Cycle loading thoughts
+  useEffect(() => {
+    let interval: any;
+    if (appState === AppState.PROCESSING) {
+      let i = 0;
+      interval = setInterval(() => {
+        i = (i + 1) % LOADING_THOUGHTS.length;
+        setLoadingThought(LOADING_THOUGHTS[i]);
+      }, 2500);
+    }
+    return () => clearInterval(interval);
+  }, [appState]);
+
   // Save history helper
   const saveToHistory = (newRecipe: Recipe) => {
+    // Avoid duplicates based on ID
+    if (history.some(r => r.id === newRecipe.id)) return;
+    
     const newHistory = [newRecipe, ...history];
     setHistory(newHistory);
     localStorage.setItem('chefMuseHistory', JSON.stringify(newHistory));
+    setIsCurrentRecipeSaved(true);
   };
 
   const handleCapture = async (data: CaptureData) => {
     setAppState(AppState.PROCESSING);
     setError(null);
     setErrorDetails(null);
+    
+    // Store inputs for potential remixing
+    setCurrentSessionImages(data.images);
+    setCurrentSessionAudio(data.audio);
+    setCurrentSessionText(undefined);
 
     try {
       // API call to Gemini with optional constraints
@@ -50,9 +94,8 @@ const App: React.FC = () => {
         data.constraints || []
       );
       
-      // Save and set state
       setRecipe(generatedRecipe);
-      saveToHistory(generatedRecipe);
+      setIsCurrentRecipeSaved(false); // New capture is not saved by default
       setAppState(AppState.RECIPE_VIEW);
 
     } catch (e: any) {
@@ -65,17 +108,43 @@ const App: React.FC = () => {
     setError(null);
     setErrorDetails(null);
 
+    // Store inputs
+    setCurrentSessionImages([]);
+    setCurrentSessionAudio(null);
+    setCurrentSessionText(text);
+
     try {
       // API call to Gemini with text only
       const generatedRecipe = await generateRecipeFromInput([], null, undefined, text);
       
       setRecipe(generatedRecipe);
-      saveToHistory(generatedRecipe);
+      setIsCurrentRecipeSaved(false); // New capture is not saved by default
       setAppState(AppState.RECIPE_VIEW);
     } catch (e: any) {
       handleError(e);
     }
   };
+
+  const handleRemix = async (constraints: string[]) => {
+    setAppState(AppState.PROCESSING);
+    setError(null);
+    try {
+      const generatedRecipe = await generateRecipeFromInput(
+        currentSessionImages,
+        currentSessionAudio, 
+        undefined, 
+        currentSessionText, 
+        constraints
+      );
+
+      setRecipe(generatedRecipe);
+      setIsCurrentRecipeSaved(false); // Remixed recipe is considered new
+      setAppState(AppState.RECIPE_VIEW);
+
+    } catch(e: any) {
+       handleError(e);
+    }
+  }
 
   const handleError = (e: any) => {
     console.error("App Error:", e);
@@ -104,11 +173,10 @@ const App: React.FC = () => {
   }
 
   const handleReset = () => {
-    // Return to Camera view (IDLE) rather than Landing Page for smoother re-use
+    // Return to Camera view (IDLE)
     setAppState(AppState.IDLE);
     setRecipe(null);
     setError(null);
-    setErrorDetails(null);
   };
 
   const handleStart = () => {
@@ -125,11 +193,24 @@ const App: React.FC = () => {
 
   const handleSelectRecipe = (selected: Recipe) => {
     setRecipe(selected);
+    setIsCurrentRecipeSaved(true); // Coming from cookbook, it's saved
+    // Clear session inputs since this is a loaded recipe
+    setCurrentSessionImages([]);
+    setCurrentSessionAudio(null);
+    setCurrentSessionText(undefined);
     setAppState(AppState.RECIPE_VIEW);
   }
 
   const handleBackToLanding = () => {
     setAppState(AppState.LANDING);
+  };
+
+  const handleBackFromRecipe = () => {
+    if (isCurrentRecipeSaved) {
+        setAppState(AppState.COOKBOOK);
+    } else {
+        setAppState(AppState.LANDING); 
+    }
   };
 
   return (
@@ -140,21 +221,21 @@ const App: React.FC = () => {
         
         {/* State: Landing Page */}
         {appState === AppState.LANDING && (
-          <div className="absolute inset-0 z-50">
+          <div className="absolute inset-0 z-50 animate-fade-in">
             <LandingPage onStart={handleStart} onAbout={handleAbout} onCookbook={handleCookbook} />
           </div>
         )}
 
         {/* State: About Page */}
         {appState === AppState.ABOUT && (
-          <div className="absolute inset-0 z-50 bg-stone-950">
+          <div className="absolute inset-0 z-50 bg-stone-950 animate-fade-in">
             <AboutPage onBack={handleBackToLanding} />
           </div>
         )}
 
         {/* State: Cookbook Page */}
         {appState === AppState.COOKBOOK && (
-          <div className="absolute inset-0 z-50 bg-stone-950">
+          <div className="absolute inset-0 z-50 bg-stone-950 animate-fade-in">
              <Cookbook 
                recipes={history} 
                onSelectRecipe={handleSelectRecipe} 
@@ -193,10 +274,15 @@ const App: React.FC = () => {
                   
                   {/* Processing Overlay */}
                   {appState === AppState.PROCESSING && (
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
-                      <Loader2 className="w-12 h-12 text-amber-350 animate-spin mb-4" />
-                      <p className="text-amber-350/80 font-serif italic text-lg animate-pulse-slow">Consulting the Muse...</p>
-                      <p className="text-stone-500 text-xs mt-2">Identifying ingredients & dreaming up flavors</p>
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-50 animate-fade-in">
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-amber-350 blur-xl opacity-20 animate-pulse"></div>
+                        <Loader2 className="w-16 h-16 text-amber-350 animate-spin mb-6 relative z-10" />
+                      </div>
+                      
+                      <p className="text-amber-350/90 font-serif italic text-xl animate-float min-h-[2rem] text-center px-4">
+                        "{loadingThought}"
+                      </p>
                     </div>
                   )}
                 </>
@@ -206,8 +292,14 @@ const App: React.FC = () => {
 
         {/* State: Recipe View */}
         {appState === AppState.RECIPE_VIEW && recipe && (
-          <div className="absolute inset-0 bg-stone-900 z-40">
-            <RecipeView recipe={recipe} onReset={handleReset} />
+          <div className="absolute inset-0 bg-stone-900 z-40 animate-fade-in">
+            <RecipeView 
+              recipe={recipe} 
+              onBack={handleBackFromRecipe} 
+              onSave={saveToHistory}
+              onRemix={handleRemix}
+              isSaved={isCurrentRecipeSaved}
+            />
           </div>
         )}
 
