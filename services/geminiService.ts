@@ -2,8 +2,11 @@ import { GoogleGenAI, Type, Schema, Modality } from "@google/genai";
 import { RECIPE_GENERATION_SYSTEM_INSTRUCTION } from "../constants";
 import { Recipe } from "../types";
 
-// Helper to get API key
-const getApiKey = () => process.env.API_KEY || '';
+// Helper to get API key safely
+const getApiKey = () => {
+  // process.env.API_KEY is replaced by Vite at build time
+  return process.env.API_KEY || '';
+};
 
 // Define Schema for structured output
 const recipeSchema: Schema = {
@@ -45,9 +48,10 @@ export const generateRecipeFromInput = async (
   textPrompt?: string,
   constraints: string[] = []
 ): Promise<Recipe> => {
-  if (!getApiKey()) throw new Error("API Key missing");
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key missing. Please configure it in your environment variables.");
 
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = new GoogleGenAI({ apiKey });
 
   const parts: any[] = [];
   
@@ -121,9 +125,10 @@ export const generateRecipeFromInput = async (
 };
 
 export const generateDishImage = async (title: string, description: string): Promise<string> => {
-  if (!getApiKey()) throw new Error("API Key missing");
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key missing");
 
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.generateContent({
@@ -148,8 +153,9 @@ export const generateDishImage = async (title: string, description: string): Pro
 };
 
 export const generateTTS = async (text: string): Promise<string> => {
-  if (!getApiKey()) throw new Error("API Key missing");
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key missing");
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.generateContent({
